@@ -1,4 +1,4 @@
-# FolderX Fresh 1.5.20 — App 启动崩溃紧急修复
+# FolderX Fresh 1.5.21 — 大文件夹转场与网格稳定性修复
 
 本工程以 **1.5.16** 为基线，保留此前已确认正常的普通 App 拖动保护、大文件夹拖动保护和 3D Touch“禁止进入文件夹”。
 
@@ -14,6 +14,16 @@
 参见 `README_1.5.20_启动崩溃修复.md` 和 `TEST_1.5.20_启动安全回归.md`。
 
 
-### 1.5.20 (open/close transient preview only)
+### 1.5.21 (large-folder transition stability)
 
-See `README_1.5.20_开合临时预览保护.md`. App launching, folder model, drag logic and menu remain from the confirmed-working 1.5.19.
+This revision keeps the exact-model transient clone guard and adds a deterministic
+layout pass for the 4x2 preview. Layout uses one bounds snapshot, disables implicit
+movement, and rejects re-entrant passes, preventing the transient left-then-right
+position jump. The 6x2 preview model remains authoritative for 4x2 folders; no
+folder model, occupied range, or native drag geometry is mutated. The package
+metadata is corrected to iphoneos-arm64e for the RootHide workflow.
+
+The five addressed classes are: duplicate transition preview, stale clone reuse,
+coordinate/frame recalculation during zoom, re-entrant layout overwrites, and the
+old 4-column preview model. Final confirmation still requires installation and
+real-device testing on the reported iOS 17 device.

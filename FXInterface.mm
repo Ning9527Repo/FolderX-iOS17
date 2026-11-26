@@ -62,6 +62,13 @@ static void FXMarkHandled(UIView *host, id app) {
 @property (nonatomic) NSUInteger gridColumns;
 @property (nonatomic, copy) NSArray<NSString *> *displayIDs;
 @property (nonatomic, strong) NSMutableArray<FXAppCell *> *cells;
+// Layout is derived from one immutable bounds snapshot per pass.  SpringBoard
+// can synchronously re-enter layoutSubviews while a folder transition is
+// changing its image view; these guards prevent a second pass from applying a
+// different column/offset model and producing the visible left-then-right jump.
+@property (nonatomic) CGRect lastLayoutBounds;
+@property (nonatomic) NSUInteger lastLayoutColumns;
+@property (nonatomic) BOOL layoutInProgress;
 - (void)updateWithApps:(NSArray *)apps;
 - (id)appAtPoint:(CGPoint)point;
 - (void)bounceAtPoint:(CGPoint)point;
@@ -142,35 +149,44 @@ static void FXMarkHandled(UIView *host, id app) {
 
 - (void)layoutSubviews {
     [super layoutSubviews];
-    if (self.cells.count == 0) return;
-    CGFloat width = self.bounds.size.width;
-    CGFloat height = self.bounds.size.height;
+    if (self.layoutInProgress || self.cells.count == 0) return;
+    CGRect boundsSnapshot = self.bounds;
+    CGFloat width = boundsSnapshot.size.width;
+    CGFloat height = boundsSnapshot.size.height;
     if (MIN(width, height) < 10) return;
-    // 4x2 refers to HOME SCREEN occupancy.  The content is 2 rows x 6
-    // columns (12 icons), NOT the old 2 rows x 4 columns (8 icons).
     BOOL wide = self.gridColumns == 6;
     NSUInteger columns = wide ? 6 : 3;
     NSUInteger rows = wide ? 2 : 3;
+    // Do not recalculate from a transient intermediate frame. During the
+    // native zoom SpringBoard may call layout twice with the old width and
+    // then the final width in the same run-loop; the old implementation
+    // visibly moved a 4x2 grid left and back right.
+    if (self.lastLayoutColumns == columns &&
+        CGRectEqualToRect(self.lastLayoutBounds, boundsSnapshot)) return;
     CGFloat marginX = round(width * (wide ? 0.045 : 0.095));
     CGFloat marginY = round(height * (wide ? 0.115 : 0.095));
     CGFloat gapX = round(width * (wide ? 0.033 : 0.076));
     CGFloat gapY = round(height * (wide ? 0.095 : 0.076));
-    CGFloat cellSize = floor(MAX(0, MIN((width - 2 * marginX - (columns-1) * gapX) / columns,
-                                          (height - 2 * marginY - (rows-1) * gapY) / rows)));
+    CGFloat cellSize = floor(MAX(0, MIN((width - 2 * marginX - (columns - 1) * gapX) / columns,
+                                          (height - 2 * marginY - (rows - 1) * gapY) / rows)));
     if (cellSize < 5) return;
-    CGFloat startX = (width - (columns * cellSize + (columns-1) * gapX)) * 0.5;
-    CGFloat startY = (height - (rows * cellSize + (rows-1) * gapY)) * 0.5;
+    CGFloat startX = round((width - (columns * cellSize + (columns - 1) * gapX)) * 0.5);
+    CGFloat startY = round((height - (rows * cellSize + (rows - 1) * gapY)) * 0.5);
+    self.layoutInProgress = YES;
+    self.lastLayoutBounds = boundsSnapshot;
+    self.lastLayoutColumns = columns;
     [CATransaction begin];
     [CATransaction setDisableActions:YES];
     for (NSUInteger i = 0; i < self.cells.count; i++) {
         UIImageView *cell = self.cells[i];
-        CGRect rect = CGRectMake(round(startX + (i % columns) * (cellSize + gapX)),
-                                 round(startY + (i / columns) * (cellSize + gapY)),
-                                 round(cellSize), round(cellSize));
+        CGRect rect = CGRectMake(startX + (i % columns) * (cellSize + gapX),
+                                 startY + (i / columns) * (cellSize + gapY),
+                                 cellSize, cellSize);
         if (!CGRectEqualToRect(cell.frame, rect)) cell.frame = rect;
         cell.layer.cornerRadius = MIN(rect.size.width, rect.size.height) * 0.22;
     }
     [CATransaction commit];
+    self.layoutInProgress = NO;
 }
 
 - (NSInteger)indexAtPoint:(CGPoint)p {

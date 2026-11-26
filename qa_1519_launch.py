@@ -19,5 +19,5 @@ assert 'object_setIvar(context, iconViewField, sourceHost)' in s
 assert 'launchActivationSettingsForIconView:' in s
 assert 'rangeOfString:@"(empty)"' in s
 assert 'FXGridReadPolicy.xm' not in (p/'Makefile').read_text()
-assert 'Version: 1.5.20' in (p/'control').read_text()
+assert 'Version: 1.5.21' in (p/'control').read_text()
 print('PASS: non-nil SBIconLaunchContext with SpringBoard settings or controlled fallback; no old nil-context launch.')

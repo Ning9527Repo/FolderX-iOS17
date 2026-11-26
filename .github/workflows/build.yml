@@ -30,24 +30,37 @@ jobs:
           ln -sfn "$SDK" "$HOME/theos/sdks/iPhoneOS${VER}.sdk"
           ls -la "$HOME/theos/sdks"
 
-      - name: Build package
+      - name: Build both architectures
         run: |
-          set -eo pipefail
-          make clean package FINALPACKAGE=1 THEOS_PACKAGE_SCHEME=roothide 2>&1 | tail -200
+          set -euo pipefail
+          rm -rf /tmp/folderx-build-* packages
+          mkdir -p packages
+          for spec in "rootless arm64 iphoneos-arm64" "roothide arm64e iphoneos-arm64e"; do
+            set -- $spec
+            scheme="$1"; arch="$2"; pkgarch="$3"
+            work="/tmp/folderx-build-$arch"
+            rsync -a --exclude .theos --exclude packages ./ "$work/"
+            cd "$work"
+            sed -i.bak "s/^Architecture:.*/Architecture: $pkgarch/" control
+            make clean package FINALPACKAGE=1 THEOS_PACKAGE_SCHEME="$scheme" ARCHS="$arch" 2>&1 | tail -200
+            found=(packages/*.deb)
+            [ -e "${found[0]}" ] || { echo "NO $arch DEB PRODUCED"; exit 1; }
+            cp "${found[0]}" "$GITHUB_WORKSPACE/packages/"
+            cd "$GITHUB_WORKSPACE"
+          done
 
       - name: Inspect result
         run: |
-          set -e
-          ls -la packages/ || true
+          set -euo pipefail
           for f in packages/*.deb; do
-            [ -e "$f" ] || { echo "NO DEB PRODUCED"; exit 1; }
             echo "--- $f"
             echo "SIZE=$(wc -c < "$f") SHA256=$(shasum -a 256 "$f" | cut -d' ' -f1)"
             ar t "$f"
           done
+          test "$(find packages -name '*.deb' | wc -l | tr -d ' ')" = 2
 
       - uses: actions/upload-artifact@v4
         with:
-          name: folderx-deb
+          name: folderx-deb-both
           path: packages/*.deb
           if-no-files-found: error
