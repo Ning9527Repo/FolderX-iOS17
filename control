@@ -1,6 +1,6 @@
 Package: com.huhansibuxin.folderexpand
 Name: FolderX
-Version: 1.5.21
+Version: 1.5.22
 Architecture: iphoneos-arm64e
 Depends: ellekit, firmware (>= 17.0), firmware (<< 18.0)
 Description: Constructs launch context from SpringBoard settings for expanded-folder App taps; retains original drag and folder-entry protections.

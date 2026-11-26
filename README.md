@@ -1,4 +1,6 @@
-# FolderX Fresh 1.5.21 — 大文件夹转场与网格稳定性修复
+# FolderX Fresh 1.5.22 — 修复 1.5.21 图标重建后跳过布局
+
+详见 [1.5.22 修复范围](README_1.5.22.md)。此前 1.5.21 关于五项问题均已修复的描述缺少证据，已撤回；原生容器转场偏移尚未证实解决。
 
 本工程以 **1.5.16** 为基线，保留此前已确认正常的普通 App 拖动保护、大文件夹拖动保护和 3D Touch“禁止进入文件夹”。
 
@@ -16,14 +18,6 @@
 
 ### 1.5.21 (large-folder transition stability)
 
-This revision keeps the exact-model transient clone guard and adds a deterministic
-layout pass for the 4x2 preview. Layout uses one bounds snapshot, disables implicit
-movement, and rejects re-entrant passes, preventing the transient left-then-right
-position jump. The 6x2 preview model remains authoritative for 4x2 folders; no
-folder model, occupied range, or native drag geometry is mutated. The package
-metadata is corrected to iphoneos-arm64e for the RootHide workflow.
-
-The five addressed classes are: duplicate transition preview, stale clone reuse,
-coordinate/frame recalculation during zoom, re-entrant layout overwrites, and the
-old 4-column preview model. Final confirmation still requires installation and
-real-device testing on the reported iOS 17 device.
+1.5.21 added a bounds/column layout cache, which could skip layout after cells
+were rebuilt. 1.5.22 removes it. The 6x2 model and clone guards already existed
+before 1.5.21. No device evidence established a fix for native transition drift.

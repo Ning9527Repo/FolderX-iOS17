@@ -62,12 +62,7 @@ static void FXMarkHandled(UIView *host, id app) {
 @property (nonatomic) NSUInteger gridColumns;
 @property (nonatomic, copy) NSArray<NSString *> *displayIDs;
 @property (nonatomic, strong) NSMutableArray<FXAppCell *> *cells;
-// Layout is derived from one immutable bounds snapshot per pass.  SpringBoard
-// can synchronously re-enter layoutSubviews while a folder transition is
-// changing its image view; these guards prevent a second pass from applying a
-// different column/offset model and producing the visible left-then-right jump.
-@property (nonatomic) CGRect lastLayoutBounds;
-@property (nonatomic) NSUInteger lastLayoutColumns;
+// Guard recursive passes only; rebuilt cells must always receive layout.
 @property (nonatomic) BOOL layoutInProgress;
 - (void)updateWithApps:(NSArray *)apps;
 - (id)appAtPoint:(CGPoint)point;
@@ -157,12 +152,6 @@ static void FXMarkHandled(UIView *host, id app) {
     BOOL wide = self.gridColumns == 6;
     NSUInteger columns = wide ? 6 : 3;
     NSUInteger rows = wide ? 2 : 3;
-    // Do not recalculate from a transient intermediate frame. During the
-    // native zoom SpringBoard may call layout twice with the old width and
-    // then the final width in the same run-loop; the old implementation
-    // visibly moved a 4x2 grid left and back right.
-    if (self.lastLayoutColumns == columns &&
-        CGRectEqualToRect(self.lastLayoutBounds, boundsSnapshot)) return;
     CGFloat marginX = round(width * (wide ? 0.045 : 0.095));
     CGFloat marginY = round(height * (wide ? 0.115 : 0.095));
     CGFloat gapX = round(width * (wide ? 0.033 : 0.076));
@@ -173,14 +162,12 @@ static void FXMarkHandled(UIView *host, id app) {
     CGFloat startX = round((width - (columns * cellSize + (columns - 1) * gapX)) * 0.5);
     CGFloat startY = round((height - (rows * cellSize + (rows - 1) * gapY)) * 0.5);
     self.layoutInProgress = YES;
-    self.lastLayoutBounds = boundsSnapshot;
-    self.lastLayoutColumns = columns;
     [CATransaction begin];
     [CATransaction setDisableActions:YES];
     for (NSUInteger i = 0; i < self.cells.count; i++) {
         UIImageView *cell = self.cells[i];
-        CGRect rect = CGRectMake(startX + (i % columns) * (cellSize + gapX),
-                                 startY + (i / columns) * (cellSize + gapY),
+        CGRect rect = CGRectMake(boundsSnapshot.origin.x + startX + (i % columns) * (cellSize + gapX),
+                                 boundsSnapshot.origin.y + startY + (i / columns) * (cellSize + gapY),
                                  cellSize, cellSize);
         if (!CGRectEqualToRect(cell.frame, rect)) cell.frame = rect;
         cell.layer.cornerRadius = MIN(rect.size.width, rect.size.height) * 0.22;
